@@ -145,6 +145,7 @@ docs/                        data design, architecture, evaluation, case study
 - [Architecture](docs/02_architecture.md): components and design decisions
 - [Evaluation](docs/03_evaluation.md): method, results, and how to read them
 - [Case study](docs/04_case_study.md): the project as a client story
+- [Portfolio Case Study](docs/PORTFOLIO_CASE_STUDY.md): recruiter- and client-focused overview with verified project results
 
 ## License
 
