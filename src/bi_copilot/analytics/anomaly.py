@@ -17,6 +17,7 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 
+from ..config import DATA_END
 from ..db import Database
 from ..plan import SQLRecord, TimeRange
 from ..semantic.catalog import Catalog
@@ -40,6 +41,10 @@ SCAN = {
 VOLUME_KPIS = {"net_revenue", "orders", "sessions", "support_tickets", "marketing_spend"}
 MIN_DENOMINATOR = {"return_rate": 20000.0, "discount_rate": 20000.0, "gross_margin_pct": 20000.0,
                    "conversion_rate": 3000.0, "stockout_rate": 200.0, "avg_csat": 15.0}
+# Refunds are observed with a 3-30 day lag after shipment in the synthetic warehouse.
+# Do not anomaly-score immature ship cohorts near the data boundary: their refund rate
+# is mechanically understated because some valid returns have not had time to arrive.
+MATURITY_LAG_DAYS = {"return_rate": 30}
 
 
 @dataclass
@@ -165,6 +170,9 @@ class AnomalyDetector:
         return out
 
     def _score(self, g: pd.DataFrame, wk, metric, met, dim, member) -> Anomaly | None:
+        maturity_days = MATURITY_LAG_DAYS.get(metric, 0)
+        if maturity_days and (wk + pd.Timedelta(days=6)).date() > DATA_END - timedelta(days=maturity_days):
+            return None
         v = g.at[wk, "value"]
         w = g.at[wk, "weight"]
         prior = g[(g.index < wk) & (g.index >= wk - pd.Timedelta(weeks=8))]

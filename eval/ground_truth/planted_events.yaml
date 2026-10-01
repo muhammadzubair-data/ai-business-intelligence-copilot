@@ -65,7 +65,7 @@ events:
     window: {start: 2024-10-01, end: 2024-11-30}
     scope: {product: AeroDesk Pro, category: Office Furniture, launch_date: 2024-09-02}
     parameters:
-      return_rate: 0.14                     # baseline for the category is ~0.03
+      return_rate: 0.18                     # baseline ~0.035; stronger signal stays >3x after realised refund-value noise
       dominant_return_reason: Defect
       defect_ticket_mult: 4.0
       csat_drop: 0.9                        # points on a 1-5 scale, for affected tickets
