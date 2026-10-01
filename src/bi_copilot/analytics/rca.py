@@ -161,12 +161,25 @@ class RootCauseAnalyzer:
             table = table[(table["weight"] >= 0.02) | (table["weight_prev"] >= 0.02)]
             if not len(table):
                 return 0.0
-        d = table["delta"].to_numpy()
+
+        # For ratio metrics, rank candidate dimensions by concentration of the
+        # within-member rate movement rather than by the full contribution
+        # (which also contains denominator-mix movement).  A geography can
+        # otherwise win merely because its share of sales changed, even when
+        # the business event is a sharp rate deterioration in one product
+        # category.  Mix is evaluated separately in analyze() below.
+        if "rate_effect" in table:
+            d = table["rate_effect"].to_numpy()
+            score_total = float(np.sum(d))
+        else:
+            d = table["delta"].to_numpy()
+            score_total = total
+
         absum = np.abs(d).sum()
         n = max(1, (np.abs(d) > 1e-9 * max(1.0, absum)).sum())
         if absum == 0 or n < 2:
             return 0.0
-        same = d * np.sign(total) if total else np.abs(d)
+        same = d * np.sign(score_total) if score_total else np.abs(d)
         top = same.max()
         return float(top / absum - 1.0 / n)
 
