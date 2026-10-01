@@ -169,10 +169,32 @@ class AnomalyDetector:
                 out[-1].gap_days = [d.date() for d in gaps.index]
         return out
 
+    @staticmethod
+    def _is_holiday_week(wk) -> bool:
+        """Return True for the Christmas/New Year holiday window.
+
+        Holiday shutdowns create expected temporary drops in operational KPIs.
+        Suppress these weeks so normal year-end seasonality is not reported as
+        a business anomaly.
+        """
+        wk = pd.Timestamp(wk).normalize()
+        days = pd.date_range(wk, wk + pd.Timedelta(days=6), freq="D")
+        return any(
+            (d.month == 12 and d.day >= 22) or (d.month == 1 and d.day <= 4)
+            for d in days
+        )
+
     def _score(self, g: pd.DataFrame, wk, metric, met, dim, member) -> Anomaly | None:
         maturity_days = MATURITY_LAG_DAYS.get(metric, 0)
         if maturity_days and (wk + pd.Timedelta(days=6)).date() > DATA_END - timedelta(days=maturity_days):
             return None
+
+        # Do not flag the Christmas/New Year shutdown period as anomalous.
+        # This keeps expected holiday seasonality quiet (for example,
+        # the week beginning 2025-12-22).
+        if self._is_holiday_week(wk):
+            return None
+
         v = g.at[wk, "value"]
         w = g.at[wk, "weight"]
         prior = g[(g.index < wk) & (g.index >= wk - pd.Timedelta(weeks=8))]
