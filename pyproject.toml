@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bi-copilot"
+version = "1.0.0"
+description = "AI Business Intelligence Copilot: governed metrics, root-cause analysis and evidence-backed answers"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["duckdb>=1.1", "pandas>=2.1", "numpy>=1.26", "pyyaml>=6.0", "pydantic>=2.6", "sqlglot>=25.0",
+                "scikit-learn>=1.4", "plotly>=5.20", "streamlit>=1.40", "requests>=2.31"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "playwright"]
+
+[project.scripts]
+bi-copilot = "bi_copilot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

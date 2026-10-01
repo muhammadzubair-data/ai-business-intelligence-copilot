@@ -1,0 +1,137 @@
+{
+  "E01": {
+    "q2_2025_net_revenue": 18524091.139999986,
+    "q2_2024_net_revenue": 19051639.01000001,
+    "yoy_change_pct": -2.7690419166724656,
+    "top_negative_contributor": "Europe x Enterprise",
+    "top_negative_delta": -1696825.9100000043,
+    "lost_key_accounts": [
+      "United Corporation 06970",
+      "Meridian Industries 01737",
+      "Pacific Industries 01341"
+    ],
+    "lost_accounts_q2_2024_revenue": 990260.5199999997,
+    "checks": {
+      "largest_negative_is_europe_enterprise": true,
+      "total_declines_yoy": true,
+      "three_accounts_lost": true
+    }
+  },
+  "E02": {
+    "revenue_change_pct": -6.245166412833136,
+    "gross_margin_prev_pct": 36.65084480107224,
+    "gross_margin_cur_pct": 31.45211706153299,
+    "margin_change_pp": -5.198727739539244,
+    "kestrel_cost_ratio_change_pct": 16.368639947600784,
+    "supplier_with_largest_cost_increase": "Kestrel Components",
+    "checks": {
+      "margin_falls": true,
+      "kestrel_is_top_cost_increase": true
+    }
+  },
+  "E03": {
+    "top_refund_amount_product": "Halden AeroDesk Pro Standing Desk",
+    "product_refund_rate_pct": 13.776248582900111,
+    "furniture_baseline_refund_rate_pct": 4.100752357030952,
+    "defect_tickets_oct_nov_2024": 222,
+    "defect_tickets_aug_sep_2024": 90,
+    "checks": {
+      "aerodesk_is_top_refund_amount": true,
+      "aerodesk_rate_3x_baseline": true,
+      "defect_tickets_up": true
+    }
+  },
+  "E04": {
+    "cac_paid_social_smb": {
+      "H1 2025": 128.52188679245282,
+      "H2 2024": 160.3189393939394,
+      "H2 2025": 308.33088235294116
+    },
+    "conversion_rate": {
+      "H1 2025": 0.01632050697745079,
+      "H2 2025": 0.010847067093649927
+    },
+    "cac_change_h2_vs_h1_pct": 139.90535001315217,
+    "checks": {
+      "cac_up": true,
+      "conversion_down": true
+    }
+  },
+  "E05": {
+    "price_effect": 587112.2274154158,
+    "volume_effect": -29886.435637054172,
+    "mix_effect": 608403.8682216359,
+    "total_change": 1165629.660000002,
+    "office_supplies_unit_growth_pct": -0.45836980061711996,
+    "other_categories_unit_growth_pct": 4.263225946454252,
+    "checks": {
+      "price_positive": true,
+      "volume_lags_other_categories": true,
+      "decomposition_sums": true
+    }
+  },
+  "E06": {
+    "marketplace_share_2022_pct": 15.337855633064542,
+    "marketplace_share_2024_pct": 34.1462983740036,
+    "contribution_margin_2022_pct": 32.47748478944508,
+    "contribution_margin_2024_pct": 31.188025705410023,
+    "checks": {
+      "share_up": true,
+      "margin_down": true
+    }
+  },
+  "E07": {
+    "apac_nov_2025": 1193646.8999999992,
+    "apac_nov_2024": 1437240.8499999982,
+    "apac_yoy_pct": -16.94872157300562,
+    "other_regions_yoy_pct": 1.9635582317771627,
+    "singapore_stockout_rate_window_pct": 4.129145618273665,
+    "singapore_stockout_rate_baseline_pct": 1.1296076099881094,
+    "checks": {
+      "apac_underperforms": true,
+      "stockouts_up": true
+    }
+  },
+  "E08": {
+    "discount_rate_by_team_q3_2025": {
+      "NA Enterprise East": 23.418623878974348,
+      "NA Enterprise West": 8.140343202911897,
+      "EU Enterprise": 8.082434793287005,
+      "LATAM Sales": 7.697558378611113,
+      "APAC Sales": 7.66018599021116,
+      "NA Commercial": 5.721899095910151,
+      "EU Commercial": 5.622404234678887
+    },
+    "checks": {
+      "east_is_top": true
+    }
+  },
+  "E09": {
+    "repeat_rate_h1_2024_pct": 43.230679837303896,
+    "repeat_rate_h1_2025_pct": 54.05714285714286,
+    "checks": {
+      "lift": true
+    }
+  },
+  "D02": {
+    "sessions_during_gap": 0,
+    "orders_during_gap": 236,
+    "checks": {
+      "sessions_zero": true,
+      "orders_normal": true
+    }
+  },
+  "D03": {
+    "booked_revenue_2025": 77812759.26000042,
+    "net_revenue_2025": 75856338.72000042,
+    "gap": 1956420.5400000066,
+    "checks": {
+      "differ": true
+    }
+  },
+  "_summary": {
+    "passed": 22,
+    "total": 22,
+    "failed": []
+  }
+}

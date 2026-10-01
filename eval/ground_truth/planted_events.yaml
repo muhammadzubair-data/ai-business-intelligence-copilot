@@ -1,0 +1,238 @@
+# =====================================================================
+# Planted business events — Halden Supply Co.
+#
+# This file does two jobs:
+#   1. The data generator reads `parameters` and applies each event on top
+#      of the baseline business (trend + seasonality + noise).
+#   2. The evaluation suite reads `expected_findings` and `gold_questions`
+#      to score whether the Copilot recovers the truth.
+#
+# `parameters` are INPUTS. The realised effect in the data will differ a
+# little because of noise, so after generation, scripts/measure_events.py
+# computes each event's actual impact and writes it to
+# realised_effects.json. Evaluation scores against the realised numbers.
+#
+# IMPORTANT: this folder must never be indexed by the RAG knowledge base.
+# If the Copilot can read the answer key, the benchmark is meaningless.
+# =====================================================================
+
+meta:
+  company: Halden Supply Co.
+  history: {start: 2022-01-01, end: 2025-12-31}
+  random_seed: 20260930
+
+events:
+
+  - id: E01
+    name: Europe enterprise account attrition
+    type: churn
+    window: {start: 2025-04-01, end: 2025-06-30}
+    scope: {segment: Enterprise, region: Europe}
+    parameters:
+      key_accounts_lost: 3                  # stop ordering entirely from 2025-04-01
+      remaining_order_frequency_mult: 0.65  # other EU enterprise accounts order less
+    expected_findings:
+      - Q2 2025 net revenue declines versus Q1 2025 and versus Q2 2024
+      - Europe x Enterprise is the largest negative contributor to the decline
+      - Three key accounts with no orders after March 2025 explain most of it
+    gold_questions:
+      - Which customer segments caused the decline in Q2 2025 revenue?
+      - Why did European revenue fall in Q2 2025?
+      - Which key accounts stopped ordering in 2025?
+    tests: [root_cause, segment_decomposition, churn_metric]
+
+  - id: E02
+    name: Supplier cost increase squeezes Tech Accessories margin
+    type: cost_shock
+    window: {start: 2025-03-01, end: null}   # permanent from start date
+    scope: {supplier: Kestrel Components, category: Tech Accessories}
+    parameters:
+      unit_cost_increase_pct: 0.18
+      list_price_change_pct: 0.0            # cost NOT passed on to customers
+    expected_findings:
+      - Revenue in Tech Accessories is roughly stable
+      - COGS rises and gross margin falls from March 2025
+      - Kestrel Components unit cost is the driver
+    gold_questions:
+      - Why did gross profit decline in 2025?
+      - Investigate why profit fell in Tech Accessories.
+      - Which suppliers raised costs this year?
+    tests: [agent_investigation, margin_analysis, supplier_drilldown]
+
+  - id: E03
+    name: AeroDesk Pro launch defect
+    type: quality_incident
+    window: {start: 2024-10-01, end: 2024-11-30}
+    scope: {product: AeroDesk Pro, category: Office Furniture, launch_date: 2024-09-02}
+    parameters:
+      return_rate: 0.14                     # baseline for the category is ~0.03
+      dominant_return_reason: Defect
+      defect_ticket_mult: 4.0
+      csat_drop: 0.9                        # points on a 1-5 scale, for affected tickets
+    expected_findings:
+      - Refund rate spikes in Oct-Nov 2024, concentrated in one new product
+      - Support tickets tagged Product Defect rise at the same time
+      - Pattern normalises from December 2024 (fix shipped)
+    gold_questions:
+      - Why did refunds increase in October 2024?
+      - Anything unusual in Q4 2024?
+      - Which product had the highest return rate last year?
+    tests: [anomaly_detection, cross_department_join, root_cause]
+
+  - id: E04
+    name: Paid social acquisition efficiency decline
+    type: marketing_efficiency
+    window: {start: 2025-07-01, end: 2025-12-31}
+    scope: {marketing_channel: Paid Social, segment: SMB}
+    parameters:
+      spend_mult: 1.25
+      conversion_rate_mult: 0.72
+    expected_findings:
+      - CAC for Paid Social rises sharply from July 2025
+      - The cause is lower conversion in SMB, not only higher spend
+    gold_questions:
+      - Why has customer acquisition cost gone up?
+      - How efficient is paid social compared to paid search this year?
+    tests: [executive_brief, funnel_analysis, anomaly_detection]
+
+  - id: E05
+    name: Office Supplies price increase
+    type: pricing
+    window: {start: 2024-04-01, end: null}
+    scope: {category: Office Supplies}
+    parameters:
+      list_price_increase_pct: 0.07
+      volume_elasticity_effect_pct: -0.06
+    expected_findings:
+      - Price effect on Office Supplies revenue is positive after April 2024
+      - Unit volume grows noticeably more slowly than in other categories (volume given up for price)
+    gold_questions:
+      - Break down the change in Office Supplies revenue in 2024 into price and volume.
+      - Did the 2024 price increase hurt sales?
+    tests: [price_volume_mix]
+
+  - id: E06
+    name: Mid-Market shift to Marketplace
+    type: channel_mix
+    window: {start: 2023-07-01, end: null}
+    scope: {segment: Mid-Market}
+    parameters:
+      marketplace_share_from: 0.15
+      marketplace_share_to: 0.35            # reached gradually by 2023-12-31
+    expected_findings:
+      - Mid-Market revenue is roughly flat but gross margin after channel fees falls
+      - Channel mix, not price or volume, explains the margin change
+    gold_questions:
+      - Why is Mid-Market margin lower than in 2022?
+      - How has the channel mix changed for Mid-Market customers?
+    tests: [price_volume_mix, mix_effect]
+
+  - id: E07
+    name: APAC stockout from supplier delay
+    type: supply_disruption
+    window: {start: 2025-10-20, end: 2025-11-30}
+    scope: {region: APAC, warehouse: Singapore DC, top_skus_affected: 25}
+    parameters:
+      supplier_lead_time_mult: 2.5
+      lost_demand_share: 0.60               # 60% of demand for out-of-stock SKUs is lost
+    expected_findings:
+      - APAC revenue dips in November 2025
+      - Stockouts at the Singapore DC and late purchase orders explain the dip
+      - Demand did not fall; availability did
+    gold_questions:
+      - Why did APAC revenue drop in November 2025?
+      - Which products were out of stock most often last quarter?
+    tests: [root_cause, inventory_linkage]
+
+  - id: E08
+    name: North America enterprise discount leakage
+    type: discounting
+    window: {start: 2025-07-01, end: 2025-09-30}
+    scope: {region: North America, segment: Enterprise, channel: Direct Sales, sales_team: NA Enterprise East}
+    parameters:
+      avg_discount_from: 0.08
+      avg_discount_to: 0.24
+    expected_findings:
+      - Gross sales are healthy but net revenue and margin lag in Q3 2025
+      - One sales team accounts for most of the discount increase
+    gold_questions:
+      - Why did net revenue grow slower than gross sales in Q3 2025?
+      - Which sales team gives the largest discounts?
+    tests: [root_cause, metric_definitions]
+
+  - id: E09
+    name: Ergonomics repeat-purchase lift
+    type: opportunity
+    window: {start: 2025-01-01, end: 2025-06-30}
+    scope: {category: Ergonomics}
+    parameters:
+      repeat_purchase_rate_mult: 1.35
+    expected_findings:
+      - Ergonomics shows an unusually strong repeat-purchase rate in H1 2025
+    gold_questions:
+      - Which product categories have the best customer retention?
+      - Where are our growth opportunities?
+    tests: [executive_brief, positive_anomaly]
+
+
+# ---------------------------------------------------------------------
+# Decoys: things that LOOK like causes or anomalies but are not.
+# The Copilot is scored on NOT making these attributions.
+# ---------------------------------------------------------------------
+decoys:
+
+  - id: D01
+    name: LATAM marketing push during the Europe decline
+    type: spurious_correlation
+    window: {start: 2025-04-01, end: 2025-06-30}
+    description: >
+      Marketing spend in LATAM rises 40% in the same quarter that Europe
+      revenue falls (E01). LATAM revenue rises modestly. There is no causal
+      link to Europe.
+    must_not_conclude:
+      - Europe revenue fell because budget moved to LATAM
+
+  - id: D02
+    name: Web tracking outage
+    type: data_quality
+    window: {start: 2025-08-10, end: 2025-08-12}
+    description: >
+      fact_web_sessions has zero sessions for all channels on these three
+      days because a tracking tag broke. Orders in fact_orders are normal.
+      The outage is documented in the knowledge base incident log, so a
+      RAG-enabled Copilot can find it.
+    must_not_conclude:
+      - Web traffic or conversion collapsed in August 2025
+    expected_behaviour: Flag as a likely data gap and cite the incident log.
+
+  - id: D03
+    name: Finance vs Sales revenue definitions
+    type: definition_trap
+    description: >
+      The Sales dashboard reports booked revenue (gross minus discounts, by
+      order date, before refunds). Finance reports net revenue (after
+      refunds, recognised on ship date). The two always differ, most in
+      months with high returns or long shipping delays.
+    gold_questions:
+      - Why does Finance revenue differ from the sales dashboard?
+    expected_behaviour: Retrieve both definitions and explain the gap with numbers.
+
+  - id: D04
+    name: Normal Q4 seasonality
+    type: expected_pattern
+    description: >
+      Every Q4 shows higher volume and deeper discounts (holiday promotions)
+      and a January dip. This is baseline behaviour, not an anomaly.
+    must_not_conclude:
+      - January revenue dropped unusually (when compared only to December)
+
+  - id: D05
+    name: EBITDA not derivable
+    type: unsupported_metric
+    description: >
+      Depreciation and amortisation are not broken out in fact_opex_monthly.
+    gold_questions:
+      - What was EBITDA last year?
+    expected_behaviour: >
+      Decline to give EBITDA, explain what is missing, and offer operating
+      profit (gross profit minus opex) as the closest available measure.

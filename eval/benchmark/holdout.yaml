@@ -1,0 +1,332 @@
+# Held-out paraphrases, written after development and not used for tuning.
+questions:
+- id: H001
+  category: metric
+  question: how much did we sell in the second quarter of 2025
+  expected_intent: metric
+  expected_metric: net_revenue
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2025-04-01'
+  - '2025-06-30'
+  gold_sql: SELECT SUM(net_line_amount) - SUM(refund_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND ship_date BETWEEN
+    DATE '2025-04-01' AND DATE '2025-06-30'
+  tags: []
+- id: H002
+  category: metric
+  question: give me total turnover for 2023
+  expected_intent: metric
+  expected_metric: net_revenue
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2023-01-01'
+  - '2023-12-31'
+  gold_sql: SELECT SUM(net_line_amount) - SUM(refund_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND ship_date BETWEEN
+    DATE '2023-01-01' AND DATE '2023-12-31'
+  tags: []
+- id: H003
+  category: metric
+  question: what were our margins like in 2024
+  expected_intent: metric
+  expected_metric: gross_margin_pct
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT (SUM(net_line_amount) - SUM(refund_amount) - SUM(cogs_amount)) / (SUM(net_line_amount) - SUM(refund_amount)) AS value FROM
+    v_sales_lines WHERE order_status = 'Shipped' AND ship_date BETWEEN DATE '2024-01-01' AND DATE '2024-12-31'
+  tags: []
+- id: H004
+  category: metric
+  question: count of orders placed during March 2025
+  expected_intent: metric
+  expected_metric: orders
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2025-03-01'
+  - '2025-03-31'
+  gold_sql: SELECT COUNT(DISTINCT order_id) AS value FROM v_sales_lines WHERE order_status <> 'Cancelled' AND order_date BETWEEN DATE '2025-03-01'
+    AND DATE '2025-03-31'
+  tags: []
+- id: H005
+  category: metric
+  question: typical basket size in the first half of 2025
+  expected_intent: metric
+  expected_metric: aov
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2025-01-01'
+  - '2025-06-30'
+  gold_sql: SELECT SUM(net_line_amount) / COUNT(DISTINCT order_id) AS value FROM v_sales_lines WHERE order_status <> 'Cancelled' AND order_date
+    BETWEEN DATE '2025-01-01' AND DATE '2025-06-30'
+  tags: []
+- id: H006
+  category: metric
+  question: how much money did we refund customers in Q4 2024
+  expected_intent: metric
+  expected_metric: refunds
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2024-10-01'
+  - '2024-12-31'
+  gold_sql: SELECT SUM(refund_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND ship_date BETWEEN DATE '2024-10-01' AND DATE
+    '2024-12-31'
+  tags: []
+- id: H007
+  category: metric
+  question: what's the average discount we gave in 2024
+  expected_intent: metric
+  expected_metric: discount_rate
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT SUM(discount_amount) / SUM(gross_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND ship_date BETWEEN DATE
+    '2024-01-01' AND DATE '2024-12-31'
+  tags: []
+- id: H008
+  category: metric
+  question: site traffic in 2024
+  expected_intent: metric
+  expected_metric: sessions
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT SUM(sessions) AS value FROM v_web WHERE TRUE AND session_date BETWEEN DATE '2024-01-01' AND DATE '2024-12-31'
+  tags: []
+- id: H009
+  category: metric
+  question: customer satisfaction score for 2024
+  expected_intent: metric
+  expected_metric: avg_csat
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT AVG(csat_score) AS value FROM v_tickets WHERE csat_score IS NOT NULL AND created_date BETWEEN DATE '2024-01-01' AND DATE '2024-12-31'
+  tags: []
+- id: H010
+  category: metric
+  question: overheads in 2024
+  expected_intent: metric
+  expected_metric: opex
+  expected_dimensions: []
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT SUM(amount_usd) AS value FROM v_opex WHERE TRUE AND month BETWEEN DATE '2024-01-01' AND DATE '2024-12-31'
+  tags: []
+- id: H011
+  category: metric
+  question: sales in latin america during 2023
+  expected_intent: metric
+  expected_metric: net_revenue
+  expected_dimensions: []
+  expected_filters:
+    region: LATAM
+  expected_period:
+  - '2023-01-01'
+  - '2023-12-31'
+  gold_sql: SELECT SUM(net_line_amount) - SUM(refund_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND ship_date BETWEEN
+    DATE '2023-01-01' AND DATE '2023-12-31' AND region = 'LATAM'
+  tags: []
+- id: H012
+  category: metric
+  question: how did small businesses do on orders in H1 2025
+  expected_intent: metric
+  expected_metric: orders
+  expected_dimensions: []
+  expected_filters:
+    segment: SMB
+  expected_period:
+  - '2025-01-01'
+  - '2025-06-30'
+  gold_sql: SELECT COUNT(DISTINCT order_id) AS value FROM v_sales_lines WHERE order_status <> 'Cancelled' AND order_date BETWEEN DATE '2025-01-01'
+    AND DATE '2025-06-30' AND segment = 'SMB'
+  tags: []
+- id: H013
+  category: metric
+  question: refund rate on office furniture, Q4 2024
+  expected_intent: metric
+  expected_metric: return_rate
+  expected_dimensions: []
+  expected_filters:
+    category: Office Furniture
+  expected_period:
+  - '2024-10-01'
+  - '2024-12-31'
+  gold_sql: SELECT SUM(refund_amount) / SUM(net_line_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND ship_date BETWEEN
+    DATE '2024-10-01' AND DATE '2024-12-31' AND category = 'Office Furniture'
+  tags: []
+- id: H014
+  category: metric
+  question: profit from the partner channel in 2024
+  expected_intent: metric
+  expected_metric: gross_profit
+  expected_dimensions: []
+  expected_filters:
+    channel: Partner
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT SUM(net_line_amount) - SUM(refund_amount) - SUM(cogs_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND
+    ship_date BETWEEN DATE '2024-01-01' AND DATE '2024-12-31' AND channel = 'Partner'
+  tags: []
+- id: H015
+  category: metric
+  question: split 2024 revenue across business units
+  expected_intent: metric
+  expected_metric: net_revenue
+  expected_dimensions:
+  - business_unit
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT business_unit AS key, SUM(net_line_amount) - SUM(refund_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped'
+    AND ship_date BETWEEN DATE '2024-01-01' AND DATE '2024-12-31' GROUP BY 1
+  tags: []
+- id: H016
+  category: metric
+  question: rank our warehouses by stockout rate for November 2025
+  expected_intent: metric
+  expected_metric: stockout_rate
+  expected_dimensions:
+  - warehouse
+  expected_filters: {}
+  expected_period:
+  - '2025-11-01'
+  - '2025-11-30'
+  gold_sql: SELECT warehouse AS key, AVG(CASE WHEN is_stockout THEN 1.0 ELSE 0.0 END) AS value FROM v_inventory WHERE TRUE AND snapshot_date BETWEEN
+    DATE '2025-11-01' AND DATE '2025-11-30' GROUP BY 1
+  tags: []
+- id: H017
+  category: metric
+  question: which vertical brought in the most revenue in 2025
+  expected_intent: metric
+  expected_metric: net_revenue
+  expected_dimensions:
+  - industry
+  expected_filters: {}
+  expected_period:
+  - '2025-01-01'
+  - '2025-12-31'
+  gold_sql: SELECT industry AS key, SUM(net_line_amount) - SUM(refund_amount) AS value FROM v_sales_lines WHERE order_status = 'Shipped' AND ship_date
+    BETWEEN DATE '2025-01-01' AND DATE '2025-12-31' GROUP BY 1
+  tags: []
+- id: H018
+  category: metric
+  question: break out ad spend by marketing channel for 2024
+  expected_intent: metric
+  expected_metric: marketing_spend
+  expected_dimensions:
+  - marketing_channel
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT marketing_channel AS key, SUM(spend_usd) AS value FROM v_marketing WHERE TRUE AND spend_date BETWEEN DATE '2024-01-01' AND
+    DATE '2024-12-31' GROUP BY 1
+  tags: []
+- id: H019
+  category: metric
+  question: which country had the most orders in 2023
+  expected_intent: metric
+  expected_metric: orders
+  expected_dimensions:
+  - country
+  expected_filters: {}
+  expected_period:
+  - '2023-01-01'
+  - '2023-12-31'
+  gold_sql: SELECT country AS key, COUNT(DISTINCT order_id) AS value FROM v_sales_lines WHERE order_status <> 'Cancelled' AND order_date BETWEEN
+    DATE '2023-01-01' AND DATE '2023-12-31' GROUP BY 1
+  tags: []
+- id: H020
+  category: metric
+  question: supplier delay rate by vendor in 2024
+  expected_intent: metric
+  expected_metric: late_po_rate
+  expected_dimensions:
+  - supplier
+  expected_filters: {}
+  expected_period:
+  - '2024-01-01'
+  - '2024-12-31'
+  gold_sql: SELECT supplier AS key, AVG(is_late) AS value FROM v_purchase_orders WHERE received_date IS NOT NULL AND po_date BETWEEN DATE '2024-01-01'
+    AND DATE '2024-12-31' GROUP BY 1
+  tags: []
+- id: H021
+  category: root_cause
+  event: E01
+  question: what happened to revenue in Q2 2025 - it went down, why?
+  expected_intent: root_cause
+  expected_metric: net_revenue
+  expected_drivers:
+  - Enterprise
+  - EU Enterprise
+- id: H022
+  category: root_cause
+  event: E03
+  question: explain the jump in refunds during October 2024
+  expected_intent: root_cause
+  expected_metric: refunds
+  expected_drivers:
+  - Halden AeroDesk Pro Standing Desk
+- id: H023
+  category: root_cause
+  event: E08
+  question: what is behind higher discounting in Q3 2025?
+  expected_intent: root_cause
+  expected_metric: discount_rate
+  expected_drivers:
+  - NA Enterprise East
+- id: H024
+  category: root_cause
+  event: E02
+  question: why is Tech Accessories less profitable in 2025?
+  expected_intent: root_cause
+  expected_metric: gross_profit
+  expected_drivers:
+  - Kestrel Components
+- id: H025
+  category: unsupported
+  question: what was our EBITDA in Q3 2025?
+  expected_intent: unsupported
+- id: H026
+  category: unsupported
+  question: tell me our net promoter score
+  expected_intent: unsupported
+- id: H027
+  category: unsupported
+  question: how many employees do we have?
+  expected_intent: unsupported
+- id: H028
+  category: definition
+  question: what does contribution margin mean?
+  expected_intent: definition
+  expected_doc: metric_catalog › Contribution Margin %
+- id: H029
+  category: definition
+  question: are big discounts allowed without approval?
+  expected_intent: definition
+  expected_doc: business_rules.md › Discount approval policy
+- id: H030
+  category: definition
+  question: why were there zero website sessions in mid August 2025?
+  expected_intent: definition
+  expected_doc: incident_log.md › INC-2025-021 — Web analytics tracking outage (10–12 August 2025)
+guard_tests:
+  block: []
+  allow: []

@@ -1,0 +1,825 @@
+# =====================================================================
+# Halden Supply Co. — Metric Catalog (semantic layer)
+#
+# The Copilot never invents business definitions. For a metric it recognises,
+# it selects the metric, dimensions, filters and time range; the compiler in
+# src/bi_copilot/semantic/compiler.py turns that into SQL deterministically.
+#
+# Metric types
+#   simple  : a single aggregate expression over a model's view
+#   ratio   : numerator / denominator, both simple metrics of the same model
+#   derived : arithmetic over metrics from different models (time dims only)
+#   custom  : a governed SQL template (churn, active customers, repeat rate)
+#
+# Ratios are stored as fractions (0.123) and displayed as percentages.
+# =====================================================================
+
+models:
+  sales:
+    view: v_sales_lines
+    description: One row per order line with customer, product, channel and refund attributes.
+    dimensions:
+      region: region
+      country: country
+      segment: segment
+      industry: industry
+      channel: channel
+      sales_team: sales_team
+      category: category
+      business_unit: business_unit
+      product: product
+      brand: brand
+      supplier: supplier
+      warehouse: warehouse
+      customer: customer_name
+      key_account: is_key_account
+  marketing:
+    view: v_marketing
+    description: Daily campaign spend, impressions and clicks.
+    dimensions:
+      marketing_channel: marketing_channel
+      segment: segment
+      region: region
+      campaign: campaign
+  acquisition:
+    view: v_acquisition
+    description: Monthly acquisition cube joining campaign spend to new customers by channel, segment and region.
+    dimensions:
+      marketing_channel: marketing_channel
+      segment: segment
+      region: region
+  web:
+    view: v_web
+    description: Daily web funnel from the analytics tool (sessions, carts, checkouts, orders).
+    dimensions:
+      marketing_channel: marketing_channel
+      segment: segment
+      region: region
+      country: country
+  support:
+    view: v_tickets
+    description: One row per customer support ticket.
+    dimensions:
+      ticket_category: ticket_category
+      priority: priority
+      contact_channel: contact_channel
+      segment: segment
+      region: region
+      product: product
+      category: category
+  inventory:
+    view: v_inventory
+    description: Weekly inventory snapshots per product and warehouse (taken Mondays).
+    dimensions:
+      warehouse: warehouse
+      region: region
+      product: product
+      category: category
+      supplier: supplier
+  purchasing:
+    view: v_purchase_orders
+    description: Purchase order lines to suppliers, with expected and received dates.
+    dimensions:
+      supplier: supplier
+      product: product
+      category: category
+      warehouse: warehouse
+      region: region
+  finance:
+    view: v_opex
+    description: Monthly operating expenses by department and expense type.
+    dimensions:
+      department: department
+      expense_type: expense_type
+
+dimensions:
+  region:            {label: Region, synonyms: [regions, geography, geographies, market, markets, territory]}
+  country:           {label: Country, synonyms: [countries, nation]}
+  segment:           {label: Customer Segment, synonyms: [segments, customer segment, customer segments, customer type, tier]}
+  industry:          {label: Industry, synonyms: [industries, vertical, verticals, sector]}
+  channel:           {label: Sales Channel, synonyms: [channels, sales channel, sales channels, route to market]}
+  sales_team:        {label: Sales Team, synonyms: [sales teams, team, teams, sales rep team]}
+  category:          {label: Product Category, synonyms: [categories, product category, product categories, product line, product lines]}
+  business_unit:     {label: Business Unit, synonyms: [business units, bu, division, divisions]}
+  product:           {label: Product, synonyms: [products, sku, skus, item, items]}
+  brand:             {label: Brand, synonyms: [brands]}
+  supplier:          {label: Supplier, synonyms: [suppliers, vendor, vendors]}
+  warehouse:         {label: Warehouse, synonyms: [warehouses, distribution center, dc, dcs, fulfillment center]}
+  customer:          {label: Customer, synonyms: [customers, account, accounts, client, clients]}
+  key_account:       {label: Key Account, synonyms: [key accounts, strategic accounts]}
+  marketing_channel: {label: Marketing Channel, synonyms: [marketing channels, acquisition channel, acquisition channels, traffic source, traffic sources]}
+  campaign:          {label: Campaign, synonyms: [campaigns]}
+  ticket_category:   {label: Ticket Category, synonyms: [ticket categories, ticket type, ticket types, issue type, issue types]}
+  priority:          {label: Ticket Priority, synonyms: [priorities]}
+  contact_channel:   {label: Contact Channel, synonyms: [support channel, support channels]}
+  department:        {label: Department, synonyms: [departments, cost center, cost centers]}
+  expense_type:      {label: Expense Type, synonyms: [expense types, cost type, cost types, expense category]}
+
+metrics:
+  # ------------------------------------------------------------ Finance view of sales (ship date)
+  net_revenue:
+    label: Net Revenue
+    type: simple
+    model: sales
+    expression: SUM(net_line_amount - refund_amount)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: up
+    owner: Finance
+    grain: Order line, recognised on ship date
+    definition: Gross sales minus discounts minus refunds, recognised when the order ships. Cancelled and unshipped orders are excluded. Refunds are attributed to the period of the original sale.
+    synonyms: [revenue, net sales, sales, turnover, top line, recognized revenue, recognised revenue, finance revenue]
+  gross_sales:
+    label: Gross Sales
+    type: simple
+    model: sales
+    expression: SUM(gross_amount)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: up
+    owner: Finance
+    grain: Order line
+    definition: Quantity times list price before any discounts or refunds, for shipped orders.
+    synonyms: [gross revenue, list price revenue]
+  discounts:
+    label: Discounts
+    type: simple
+    model: sales
+    expression: SUM(discount_amount)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: down
+    owner: Finance
+    grain: Order line
+    definition: Total price reductions given on shipped order lines.
+    synonyms: [discount amount, discounting, price reductions]
+  sales_after_discounts:
+    label: Sales After Discounts
+    type: simple
+    model: sales
+    expression: SUM(net_line_amount)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: up
+    owner: Finance
+    grain: Order line
+    definition: Gross sales minus discounts, before refunds. Used as the base for return rate and average selling price.
+    synonyms: [invoiced sales, net of discounts]
+  refunds:
+    label: Refunds
+    type: simple
+    model: sales
+    expression: SUM(refund_amount)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: down
+    owner: Finance
+    grain: Order line
+    definition: Money returned to customers for returned items, attributed to the period of the original sale.
+    synonyms: [refund amount, returns value, refunded]
+  cogs:
+    label: Cost of Goods Sold
+    type: simple
+    model: sales
+    expression: SUM(cogs_amount)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: down
+    owner: Finance
+    grain: Order line
+    definition: Supplier unit cost on the order date times quantity shipped. Returned items are not credited back to COGS.
+    synonyms: [cost of goods sold, cost of sales, product cost, product costs, costs]
+  gross_profit:
+    label: Gross Profit
+    type: simple
+    model: sales
+    expression: SUM(net_line_amount - refund_amount - cogs_amount)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: up
+    owner: Finance
+    grain: Order line
+    definition: Net revenue minus cost of goods sold.
+    synonyms: [profit, gross profits, margin dollars, gross margin dollars, profitability]
+  gross_margin_pct:
+    label: Gross Margin %
+    type: ratio
+    numerator: gross_profit
+    denominator: net_revenue
+    format: percent
+    direction: up
+    owner: Finance
+    definition: Gross profit divided by net revenue.
+    synonyms: [gross margin, margin, margins, gross margin percentage, gm]
+  channel_fees:
+    label: Channel Fees
+    type: simple
+    model: sales
+    expression: SUM(net_line_amount * channel_fee_pct)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: down
+    owner: Finance
+    grain: Order line
+    definition: Marketplace commissions, partner commissions and payment fees, computed as sales after discounts times the channel fee rate.
+    synonyms: [marketplace fees, commissions, partner fees]
+  contribution_profit:
+    label: Contribution Profit
+    type: simple
+    model: sales
+    expression: SUM(net_line_amount - refund_amount - cogs_amount - net_line_amount * channel_fee_pct)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: currency
+    direction: up
+    owner: Finance
+    grain: Order line
+    definition: Gross profit minus channel fees.
+    synonyms: [contribution, contribution dollars]
+  contribution_margin_pct:
+    label: Contribution Margin %
+    type: ratio
+    numerator: contribution_profit
+    denominator: net_revenue
+    format: percent
+    direction: up
+    owner: Finance
+    definition: Contribution profit divided by net revenue. This is gross margin after channel fees.
+    synonyms: [contribution margin, margin after channel fees, margin after fees]
+  units_sold:
+    label: Units Sold
+    type: simple
+    model: sales
+    expression: SUM(quantity)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: number
+    direction: up
+    owner: Operations
+    grain: Order line
+    definition: Units shipped to customers.
+    synonyms: [units, volume, quantity, quantity sold, unit sales, items sold]
+  units_returned:
+    label: Units Returned
+    type: simple
+    model: sales
+    expression: SUM(quantity_returned)
+    filter: order_status = 'Shipped'
+    time_column: ship_date
+    format: number
+    direction: down
+    owner: Operations
+    grain: Order line
+    definition: Units returned by customers, attributed to the period of the original sale.
+    synonyms: [returned units, returns, product returns]
+  return_rate:
+    label: Return Rate (Refund %)
+    type: ratio
+    numerator: refunds
+    denominator: sales_after_discounts
+    format: percent
+    direction: down
+    owner: Finance
+    definition: Refunds as a share of sales after discounts.
+    synonyms: [refund rate, return rate, returns rate, refund percentage, refund ratio]
+  discount_rate:
+    label: Discount Rate
+    type: ratio
+    numerator: discounts
+    denominator: gross_sales
+    format: percent
+    direction: down
+    owner: Finance
+    definition: Discounts as a share of gross sales.
+    synonyms: [discount rate, average discount, discount percentage, discount level, discount levels, discounting rate]
+  avg_selling_price:
+    label: Average Selling Price
+    type: ratio
+    numerator: sales_after_discounts
+    denominator: units_sold
+    format: currency
+    direction: up
+    owner: Finance
+    definition: Sales after discounts per unit sold.
+    synonyms: [asp, average price, price per unit, unit price]
+
+  # ------------------------------------------------------------ Sales view (order date)
+  booked_revenue:
+    label: Booked Revenue
+    type: simple
+    model: sales
+    expression: SUM(net_line_amount)
+    filter: order_status <> 'Cancelled'
+    time_column: order_date
+    format: currency
+    direction: up
+    owner: Sales
+    grain: Order line, by order date
+    definition: Gross sales minus discounts on non-cancelled orders, by order date, before refunds. This is the number on the Sales dashboard.
+    synonyms: [bookings, booked sales, sales dashboard revenue, order value, ordered revenue]
+  orders:
+    label: Orders
+    type: simple
+    model: sales
+    expression: COUNT(DISTINCT order_key)
+    filter: order_status <> 'Cancelled'
+    time_column: order_date
+    format: number
+    direction: up
+    owner: Sales
+    grain: Order
+    definition: Number of non-cancelled orders placed.
+    synonyms: [order count, number of orders, orders placed, transactions]
+  aov:
+    label: Average Order Value
+    type: ratio
+    numerator: booked_revenue
+    denominator: orders
+    format: currency
+    direction: up
+    owner: Sales
+    definition: Booked revenue divided by the number of orders.
+    synonyms: [average order value, basket size, avg order value, order size]
+  ordering_customers:
+    label: Ordering Customers
+    type: simple
+    model: sales
+    expression: COUNT(DISTINCT customer_key)
+    filter: order_status <> 'Cancelled'
+    time_column: order_date
+    format: number
+    direction: up
+    owner: Sales
+    grain: Customer
+    additive: false
+    definition: Distinct customers who placed at least one non-cancelled order in the period.
+    synonyms: [buying customers, purchasing customers, customers who ordered, number of customers]
+
+  # ------------------------------------------------------------ Customers (governed templates)
+  active_customers:
+    label: Active Customers
+    type: custom
+    model: sales
+    allowed_dimensions: [segment, region, country, industry, key_account]
+    format: number
+    direction: up
+    owner: Customer Success
+    definition: Customers with at least one non-cancelled order within their activity window before the period end. Windows are 90 days for Enterprise and Mid-Market, 180 days for SMB and 365 days for Consumer.
+    synonyms: [active customer, active accounts, customer base, active customer count]
+    template: |
+      WITH c AS (
+        SELECT customer_key, ANY_VALUE(segment) AS seg{dims_any},
+               MAX(order_date) AS last_order
+        FROM v_sales_lines
+        WHERE order_status <> 'Cancelled' AND order_date <= DATE '{end}'{where}
+        GROUP BY customer_key
+      )
+      SELECT {dims_select}COUNT(*) FILTER (WHERE last_order > DATE '{end}' - CASE seg WHEN 'Enterprise' THEN 90 WHEN 'Mid-Market' THEN 90 WHEN 'SMB' THEN 180 ELSE 365 END)::DOUBLE AS active_customers
+      FROM c GROUP BY ALL
+  churn_rate:
+    label: Customer Churn Rate
+    type: custom
+    model: sales
+    allowed_dimensions: [segment, region, country, industry, key_account]
+    format: percent
+    direction: down
+    owner: Customer Success
+    definition: Share of customers active at the start of the period (ordered within their activity window) who were no longer active at the end of it. Activity windows are 90 days for Enterprise and Mid-Market, 180 for SMB and 365 for Consumer.
+    synonyms: [churn, customer churn, attrition, attrition rate, customer attrition, lost customers]
+    template: |
+      WITH c AS (
+        SELECT customer_key, ANY_VALUE(segment) AS seg{dims_any},
+               MAX(order_date) FILTER (WHERE order_date < DATE '{start}') AS last_before_start,
+               MAX(order_date) FILTER (WHERE order_date <= DATE '{end}') AS last_before_end
+        FROM v_sales_lines
+        WHERE order_status <> 'Cancelled' AND order_date <= DATE '{end}'{where}
+        GROUP BY customer_key
+      ), f AS (
+        SELECT *, CASE seg WHEN 'Enterprise' THEN 90 WHEN 'Mid-Market' THEN 90 WHEN 'SMB' THEN 180 ELSE 365 END AS w FROM c
+      )
+      SELECT {dims_select}
+        (COUNT(*) FILTER (WHERE last_before_start >= DATE '{start}' - w AND last_before_end <= DATE '{end}' - w))::DOUBLE
+        / NULLIF(COUNT(*) FILTER (WHERE last_before_start >= DATE '{start}' - w), 0) AS churn_rate
+      FROM f GROUP BY ALL
+  repeat_purchase_rate:
+    label: Repeat Purchase Rate
+    type: custom
+    model: sales
+    allowed_dimensions: [segment, region, country, category, business_unit, channel]
+    format: percent
+    direction: up
+    owner: Customer Success
+    definition: Among customers who bought in the period, the share who placed two or more separate orders in it. With a category dimension or filter, only orders containing that category count.
+    synonyms: [repeat rate, repeat purchases, repurchase rate, retention, customer retention, repeat customers, loyalty]
+    template: |
+      SELECT {dims_select}AVG((n >= 2)::DOUBLE) AS repeat_purchase_rate
+      FROM (
+        SELECT {dims_raw}customer_key, COUNT(DISTINCT order_key) AS n
+        FROM v_sales_lines
+        WHERE order_status <> 'Cancelled' AND order_date BETWEEN DATE '{start}' AND DATE '{end}'{where}
+        GROUP BY ALL
+      ) GROUP BY ALL
+
+  # ------------------------------------------------------------ Marketing
+  marketing_spend:
+    label: Marketing Spend
+    type: simple
+    model: marketing
+    expression: SUM(spend_usd)
+    time_column: spend_date
+    format: currency
+    direction: down
+    owner: Marketing
+    grain: Campaign x day
+    definition: Paid media, events, email and affiliate spend.
+    synonyms: [ad spend, advertising spend, spend, marketing budget, media spend, marketing costs]
+  impressions:
+    label: Impressions
+    type: simple
+    model: marketing
+    expression: SUM(impressions)
+    time_column: spend_date
+    format: number
+    direction: up
+    owner: Marketing
+    grain: Campaign x day
+    definition: Ad impressions served.
+    synonyms: [ad impressions, reach]
+  clicks:
+    label: Clicks
+    type: simple
+    model: marketing
+    expression: SUM(clicks)
+    time_column: spend_date
+    format: number
+    direction: up
+    owner: Marketing
+    grain: Campaign x day
+    definition: Ad clicks.
+    synonyms: [ad clicks]
+  ctr:
+    label: Click-Through Rate
+    type: ratio
+    numerator: clicks
+    denominator: impressions
+    format: percent
+    direction: up
+    owner: Marketing
+    definition: Clicks divided by impressions.
+    synonyms: [click through rate, click-through rate]
+  acquisition_spend:
+    label: Acquisition Spend
+    type: simple
+    model: acquisition
+    expression: SUM(spend_usd)
+    filter: marketing_channel IN ('Paid Search', 'Paid Social', 'Email', 'Events', 'Affiliate')
+    time_column: month
+    format: currency
+    direction: down
+    owner: Marketing
+    grain: Month x channel x segment x region
+    definition: Campaign spend aggregated to the acquisition cube.
+    synonyms: [acquisition budget]
+  new_customers:
+    label: New Customers
+    type: simple
+    model: acquisition
+    expression: SUM(new_customers)
+    time_column: month
+    format: number
+    direction: up
+    owner: Marketing
+    grain: Month x channel x segment x region
+    definition: Customers created in the period, by the channel that acquired them (includes organic and referral).
+    synonyms: [customer acquisitions, acquired customers, new accounts, signups, sign-ups, customer growth]
+  paid_new_customers:
+    label: Paid New Customers
+    type: simple
+    model: acquisition
+    expression: SUM(new_customers)
+    filter: marketing_channel IN ('Paid Search', 'Paid Social', 'Email', 'Events', 'Affiliate')
+    time_column: month
+    format: number
+    direction: up
+    owner: Marketing
+    grain: Month x channel x segment x region
+    definition: New customers acquired through paid marketing channels.
+    synonyms: [paid acquisitions]
+  cac:
+    label: Customer Acquisition Cost
+    type: ratio
+    numerator: acquisition_spend
+    denominator: paid_new_customers
+    format: currency
+    direction: down
+    owner: Marketing
+    definition: Paid marketing spend divided by new customers acquired through paid channels. Organic, referral and direct-sales acquisitions are excluded from both sides.
+    synonyms: [customer acquisition cost, acquisition cost, cost per acquisition, cpa, cost per customer]
+
+  # ------------------------------------------------------------ Web funnel
+  sessions:
+    label: Web Sessions
+    type: simple
+    model: web
+    expression: SUM(sessions)
+    time_column: session_date
+    format: number
+    direction: up
+    owner: Marketing
+    grain: Day x channel x segment x country
+    definition: Website sessions recorded by the web analytics tool.
+    synonyms: [traffic, web traffic, visits, website visits, site traffic]
+  web_orders:
+    label: Web Orders
+    type: simple
+    model: web
+    expression: SUM(web_orders)
+    time_column: session_date
+    format: number
+    direction: up
+    owner: Marketing
+    grain: Day x channel x segment x country
+    definition: Orders attributed by the web analytics tool. These do not reconcile exactly with the order system.
+    synonyms: [online orders, website orders]
+  conversion_rate:
+    label: Conversion Rate
+    type: ratio
+    numerator: web_orders
+    denominator: sessions
+    format: percent
+    direction: up
+    owner: Marketing
+    definition: Web orders divided by web sessions.
+    synonyms: [conversion, cvr, web conversion, site conversion, conversions]
+
+  # ------------------------------------------------------------ Support
+  support_tickets:
+    label: Support Tickets
+    type: simple
+    model: support
+    expression: COUNT(*)
+    time_column: created_date
+    format: number
+    direction: down
+    owner: Support
+    grain: Ticket
+    definition: Customer support tickets opened.
+    synonyms: [tickets, ticket volume, support volume, support requests, complaints, cases]
+  defect_tickets:
+    label: Product Defect Tickets
+    type: simple
+    model: support
+    expression: COUNT(*) FILTER (WHERE ticket_category = 'Product Defect')
+    time_column: created_date
+    format: number
+    direction: down
+    owner: Support
+    grain: Ticket
+    definition: Support tickets categorised as Product Defect.
+    synonyms: [defect tickets, defect complaints, quality complaints, product defects, defects]
+  csat_sum:
+    label: CSAT Score Total
+    type: simple
+    model: support
+    expression: SUM(csat_score)
+    time_column: created_date
+    format: number
+    hidden: true
+    definition: Sum of CSAT survey scores (helper for average CSAT).
+  csat_responses:
+    label: CSAT Responses
+    type: simple
+    model: support
+    expression: COUNT(csat_score)
+    time_column: created_date
+    format: number
+    direction: up
+    owner: Support
+    grain: Ticket
+    definition: Tickets with a CSAT survey response.
+    synonyms: [survey responses]
+  avg_csat:
+    label: Average CSAT
+    type: ratio
+    numerator: csat_sum
+    denominator: csat_responses
+    format: decimal
+    direction: up
+    owner: Support
+    definition: Average customer satisfaction score on a 1 to 5 scale, from post-ticket surveys.
+    synonyms: [csat, customer satisfaction, satisfaction score, satisfaction]
+  resolution_days_sum:
+    label: Resolution Days Total
+    type: simple
+    model: support
+    expression: SUM(resolution_days)
+    time_column: created_date
+    format: number
+    hidden: true
+    definition: Helper for average resolution time.
+  resolved_tickets:
+    label: Resolved Tickets
+    type: simple
+    model: support
+    expression: COUNT(resolution_days)
+    time_column: created_date
+    format: number
+    direction: up
+    owner: Support
+    grain: Ticket
+    definition: Tickets that have been resolved.
+    synonyms: [closed tickets]
+  avg_resolution_days:
+    label: Average Resolution Time (days)
+    type: ratio
+    numerator: resolution_days_sum
+    denominator: resolved_tickets
+    format: decimal
+    direction: down
+    owner: Support
+    definition: Average days from ticket creation to resolution, for resolved tickets.
+    synonyms: [resolution time, time to resolve, average resolution time, handling time]
+
+  # ------------------------------------------------------------ Inventory & purchasing
+  stockout_count:
+    label: Stockout Snapshots
+    type: simple
+    model: inventory
+    expression: SUM(is_stockout::INT)
+    time_column: snapshot_date
+    format: number
+    direction: down
+    owner: Operations
+    grain: Product x warehouse x week
+    definition: Weekly product-warehouse snapshots with zero units on hand.
+    synonyms: [stockouts, out of stock, out-of-stock, stock outs]
+  snapshot_count:
+    label: Inventory Snapshots
+    type: simple
+    model: inventory
+    expression: COUNT(*)
+    time_column: snapshot_date
+    format: number
+    hidden: true
+    definition: Helper for stockout rate.
+  stockout_rate:
+    label: Stockout Rate
+    type: ratio
+    numerator: stockout_count
+    denominator: snapshot_count
+    format: percent
+    direction: down
+    owner: Operations
+    definition: Share of weekly product-warehouse snapshots that were out of stock.
+    synonyms: [stockout rate, out of stock rate, availability gap, stock availability]
+  po_value:
+    label: Purchase Order Value
+    type: simple
+    model: purchasing
+    expression: SUM(po_value)
+    time_column: po_date
+    format: currency
+    direction: down
+    owner: Operations
+    grain: Purchase order line
+    definition: Quantity times unit cost on purchase orders placed with suppliers.
+    synonyms: [purchasing spend, procurement spend, purchase value, supplier spend]
+  po_units:
+    label: Purchased Units
+    type: simple
+    model: purchasing
+    expression: SUM(quantity)
+    time_column: po_date
+    format: number
+    direction: up
+    owner: Operations
+    grain: Purchase order line
+    definition: Units ordered from suppliers.
+    synonyms: [units purchased]
+  avg_po_unit_cost:
+    label: Average Purchase Unit Cost
+    type: ratio
+    numerator: po_value
+    denominator: po_units
+    format: currency
+    direction: down
+    owner: Operations
+    definition: Purchase order value per unit ordered. Mix across products affects this; use COGS by product for like-for-like cost changes.
+    synonyms: [supplier cost, supplier costs, unit cost, purchase cost, supplier prices]
+  late_pos:
+    label: Late Purchase Orders
+    type: simple
+    model: purchasing
+    expression: SUM(is_late)
+    time_column: po_date
+    format: number
+    direction: down
+    owner: Operations
+    grain: Purchase order line
+    definition: Received purchase orders that arrived after the expected date.
+    synonyms: [late deliveries, late shipments from suppliers]
+  received_pos:
+    label: Received Purchase Orders
+    type: simple
+    model: purchasing
+    expression: COUNT(received_date)
+    time_column: po_date
+    format: number
+    hidden: true
+    definition: Helper for late PO rate and lead time.
+  late_po_rate:
+    label: Late PO Rate
+    type: ratio
+    numerator: late_pos
+    denominator: received_pos
+    format: percent
+    direction: down
+    owner: Operations
+    definition: Share of received purchase orders that arrived late.
+    synonyms: [supplier on-time rate, late delivery rate, supplier delays, supplier delay rate, late po rate, late purchase order rate, arrived late]
+  lead_time_sum:
+    label: Lead Time Days Total
+    type: simple
+    model: purchasing
+    expression: SUM(lead_time_days)
+    time_column: po_date
+    format: number
+    hidden: true
+    definition: Helper for average lead time.
+  avg_lead_time_days:
+    label: Average Supplier Lead Time (days)
+    type: ratio
+    numerator: lead_time_sum
+    denominator: received_pos
+    format: decimal
+    direction: down
+    owner: Operations
+    definition: Average days from purchase order to receipt, for received orders.
+    synonyms: [lead time, supplier lead time, delivery time]
+
+  # ------------------------------------------------------------ Finance (opex) and derived
+  opex:
+    label: Operating Expenses
+    type: simple
+    model: finance
+    expression: SUM(amount_usd)
+    time_column: month
+    format: currency
+    direction: down
+    owner: Finance
+    grain: Month x department x expense type
+    definition: Monthly operating expenses including payroll, software, facilities, travel and other operating costs. Depreciation and amortisation are included in Other Operating and are not reported separately.
+    synonyms: [operating expenses, operating costs, overheads, overhead, expenses, sg&a, opex]
+  operating_profit:
+    label: Operating Profit
+    type: derived
+    formula: gross_profit - opex
+    components: [gross_profit, opex]
+    format: currency
+    direction: up
+    owner: Finance
+    definition: Gross profit minus operating expenses. Includes depreciation and amortisation inside operating expenses, so it is an operating profit (EBIT-style) measure, not EBITDA.
+    synonyms: [operating income, ebit, operating result]
+  operating_margin_pct:
+    label: Operating Margin %
+    type: derived
+    formula: (gross_profit - opex) / NULLIF(net_revenue, 0)
+    components: [gross_profit, opex, net_revenue]
+    format: percent
+    direction: up
+    owner: Finance
+    definition: Operating profit divided by net revenue.
+    synonyms: [operating margin, ebit margin]
+
+# Business concepts people ask for that this warehouse cannot answer honestly.
+unsupported_concepts:
+  ebitda: Depreciation and amortisation are not broken out in operating expenses, so EBITDA cannot be derived. Operating profit (gross profit minus opex) is the closest available measure.
+  ebitda margin: Depreciation and amortisation are not broken out in operating expenses, so EBITDA margin cannot be derived. Operating margin is the closest available measure.
+  net income: Interest, taxes and other non-operating items are not in the warehouse, so net income cannot be calculated.
+  net profit: Interest, taxes and other non-operating items are not in the warehouse, so net profit cannot be calculated.
+  earnings per share: Share counts and net income are not in the warehouse.
+  eps: Share counts and net income are not in the warehouse.
+  free cash flow: Cash flow statement data (capex, working capital) is not in the warehouse.
+  cash flow: Cash flow statement data is not in the warehouse.
+  nps: No Net Promoter Score survey data is collected. Average CSAT from support surveys is available instead.
+  net promoter score: No Net Promoter Score survey data is collected. Average CSAT from support surveys is available instead.
+  lifetime value: There is no approved customer lifetime value definition in the metric catalog. Revenue per customer and churn rate are available.
+  ltv: There is no approved customer lifetime value definition in the metric catalog. Revenue per customer and churn rate are available.
+  clv: There is no approved customer lifetime value definition in the metric catalog. Revenue per customer and churn rate are available.
+  market share: The warehouse has no data on competitors or total market size.
+  headcount: Employee data is not in the warehouse; operating expenses show payroll cost only.
+  employee turnover: Employee data is not in the warehouse.
+  stock price: Company share price data is not in the warehouse.
+  share price: Company share price data is not in the warehouse.
+  mrr: Halden sells products, not subscriptions, so there is no recurring revenue metric.
+  arr: Halden sells products, not subscriptions, so there is no recurring revenue metric.
+  inventory turnover: Inventory is stored in units without valuation, so inventory turnover in value terms is not defined in the catalog. Stockout rate and on-hand units are available.
+  carbon emissions: No sustainability or emissions data is collected.
