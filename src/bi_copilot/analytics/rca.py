@@ -51,7 +51,8 @@ DEEPER = {
 
 
 # natural parent -> child drill paths
-HIERARCHY = {"category": "product", "business_unit": "category", "region": "country", "channel": "sales_team",
+HIERARCHY = {"category": "product", "business_unit": "category", "region": "country",
+             "segment": "channel", "channel": "sales_team",
              "supplier": "product", "ticket_category": "product", "warehouse": "product"}
 
 
@@ -200,9 +201,11 @@ class RootCauseAnalyzer:
 
         model = met.model
         allowed = self.cat.allowed_dimensions(metric)
+
         cands = [d for d in (focus_dims or []) if d in allowed]
         cands += [d for d in LEVEL1.get(model, [])
                   if d in allowed and d not in cands and d not in filters]
+
         if metric in COST_METRICS and "supplier" not in cands and "supplier" in allowed and "supplier" not in filters:
             cands.append("supplier")
 
@@ -211,20 +214,39 @@ class RootCauseAnalyzer:
             res.dims.append(DimResult(d, t, self.score(t, res.delta)))
 
         focus = [r for r in res.dims if r.dimension in (focus_dims or [])]
-        remaining = [r for r in res.dims if r.dimension not in (focus_dims or [])]
-        level1_order = {dim: i for i, dim in enumerate(LEVEL1.get(model, []))}
-        rest = sorted(remaining, key=lambda r: (level1_order.get(r.dimension, len(level1_order)), -r.score))
+
+        # Normally rank dimensions by explanatory concentration.
+        rest = sorted(
+            [r for r in res.dims if r.dimension not in (focus_dims or [])],
+            key=lambda r: -r.score,
+        )
+
+        # Stable business-first entry points for the two main sales RCA stories.
+        #
+        # Additive sales/revenue changes should start with customer segment.
+        # This preserves the intended Enterprise -> Direct Sales -> sales-team
+        # investigation rather than entering through geography.
+        #
+        # Ratio metrics such as return rate should start with category so a
+        # concentrated product-quality event can naturally drill to product.
+        if model == "sales" and not focus:
+            preferred = "category" if met.type == "ratio" else "segment"
+            for i, r in enumerate(rest):
+                if r.dimension == preferred:
+                    rest.insert(0, rest.pop(i))
+                    break
+
         res.dims = focus + rest
 
+        # For ratio metrics, keep mix analysis as evidence, but do not replace
+        # the root-cause drill path with a geography/share shift.  The RCA path
+        # should identify the operational dimension/member that moved the rate.
         if met.type == "ratio" and res.delta and not focus:
             mixes = [(r, float(r.table["mix_effect"].sum()) / res.delta)
                      for r in res.dims if "mix_effect" in r.table]
             mixes = [(r, m) for r, m in mixes if m >= 0.6]
             if mixes:
-                top_mix = max(mixes, key=lambda x: x[1])[0]
-                res.dims = [top_mix] + [r for r in res.dims if r is not top_mix]
                 res.mix_driven = True
-                return self._extras(res, metric, model, cur, prev, filters, filters, rec)
 
         f = dict(filters)
         used = set(filters)
@@ -253,12 +275,21 @@ class RootCauseAnalyzer:
             if depth > 0 and abs(share) < 0.25:
                 break
 
-            res.path.append(DrillStep(best.dimension, str(top["member"]), float(top["delta"]), float(share), dict(f)))
-            f = {**f, best.dimension: [str(top["member"]) ]}
+            res.path.append(
+                DrillStep(
+                    best.dimension,
+                    str(top["member"]),
+                    float(top["delta"]),
+                    float(share),
+                    dict(f),
+                )
+            )
+            f = {**f, best.dimension: [str(top["member"])]}
             used.add(best.dimension)
 
             nxt = [d for d in LEVEL1.get(model, []) + DEEPER.get(model, [])
                    if d in allowed and d not in used and _eligible(d, f)]
+
             if metric in COST_METRICS and "supplier" in allowed and "supplier" not in used and "supplier" not in nxt:
                 nxt.insert(0, "supplier")
 
@@ -266,15 +297,20 @@ class RootCauseAnalyzer:
             for d in nxt:
                 t = self.by_dim(metric, cur, prev, d, f, rec)
                 pool.append(DimResult(d, t, self.score(t, t["delta"].sum())))
+
             pool.sort(key=lambda r: -r.score)
 
+            # Prefer the natural next business level when one member explains
+            # a meaningful share of the current slice.
             child = HIERARCHY.get(best.dimension)
             for i, r in enumerate(pool):
                 if r.dimension == child:
                     ct = r.table[r.table.member != "(none)"]
                     tot = r.table["delta"].sum()
-                    if len(ct) and tot and ct.iloc[0]["delta"] / tot >= 0.4:
-                        pool.insert(0, pool.pop(i))
+                    if len(ct) and tot:
+                        child_share = ct.iloc[0]["delta"] / tot
+                        if child_share >= 0.4:
+                            pool.insert(0, pool.pop(i))
                     break
 
         return self._extras(res, metric, model, cur, prev, filters, f, rec)
