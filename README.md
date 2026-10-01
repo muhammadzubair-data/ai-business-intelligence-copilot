@@ -4,6 +4,18 @@ Ask a business question in plain English. Get the answer, the reason behind it, 
 
 ## 🚀 Live Demo
 
+
+
+**Try the deployed application:**
+
+https://zubairlabs-ai-copilot.streamlit.app
+
+The application lets you explore governed business metrics, root-cause analysis, anomaly detection, forecasting, multi-step investigations, and evidence-backed answers through a conversational BI interface.
+
+> Demo environment: Halden Supply Co. — a synthetic workspace-products distributor created specifically for reproducible evaluation.
+
+![Root-cause answer](docs/screenshots/01_root_cause.png)
+
 ## Product Walkthrough
 
 ### Root-Cause Analysis
@@ -35,16 +47,6 @@ Generate forward-looking business forecasts while preserving historical context,
 The copilot is designed to distinguish supported analytical questions from requests that cannot be reliably answered from the available business data.
 
 ![Governed Unsupported Question](docs/screenshots/05_unsupported.png)
-
-**Try the deployed application:**
-
-https://zubairlabs-ai-copilot.streamlit.app
-
-The application lets you explore governed business metrics, root-cause analysis, anomaly detection, forecasting, multi-step investigations, and evidence-backed answers through a conversational BI interface.
-
-> Demo environment: Halden Supply Co. — a synthetic workspace-products distributor created specifically for reproducible evaluation.
-
-![Root-cause answer](docs/screenshots/01_root_cause.png)
 
 > **"Why did revenue decline in Q2 2025?"**
 > Net Revenue fell 2.3% (-$431K) to $18.56M in Q2 2025 versus Q2 2024.. The change is concentrated in Enterprise → Direct Sales → the EU Enterprise team. Three European key accounts placed no orders after March; together they generated $758K in Q2 2024.
