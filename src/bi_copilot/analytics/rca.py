@@ -191,27 +191,34 @@ class RootCauseAnalyzer:
         met = self.cat.metrics[metric]
         cv, pv = self.value(metric, cur, filters, rec), self.value(metric, prev, filters, rec)
         res = RCAResult(metric, cur, prev, cv, pv, cv - pv, sql=rec, additive=met.type != "ratio")
+
         if met.type in ("custom", "derived"):
             for d in (focus_dims or [])[:1] or (met.allowed_dimensions or [])[:2]:
                 t = self._plain_by_dim(metric, cur, prev, d, filters, rec)
                 res.dims.append(DimResult(d, t, 0.0))
             return res
+
         model = met.model
         allowed = self.cat.allowed_dimensions(metric)
         cands = [d for d in (focus_dims or []) if d in allowed]
-        cands += [d for d in LEVEL1.get(model, []) if d in allowed and d not in cands and d not in filters]
+        cands += [d for d in LEVEL1.get(model, [])
+                  if d in allowed and d not in cands and d not in filters]
         if metric in COST_METRICS and "supplier" not in cands and "supplier" in allowed and "supplier" not in filters:
             cands.append("supplier")
+
         for d in cands:
             t = self.by_dim(metric, cur, prev, d, filters, rec)
             res.dims.append(DimResult(d, t, self.score(t, res.delta)))
-        # focus dimensions stay first; the rest by score
+
         focus = [r for r in res.dims if r.dimension in (focus_dims or [])]
-        rest = sorted([r for r in res.dims if r.dimension not in (focus_dims or [])], key=lambda r: -r.score)
+        remaining = [r for r in res.dims if r.dimension not in (focus_dims or [])]
+        level1_order = {dim: i for i, dim in enumerate(LEVEL1.get(model, []))}
+        rest = sorted(remaining, key=lambda r: (level1_order.get(r.dimension, len(level1_order)), -r.score))
         res.dims = focus + rest
-        # ratio metrics: a dimension whose mix shift explains most of the change is the story
+
         if met.type == "ratio" and res.delta and not focus:
-            mixes = [(r, float(r.table["mix_effect"].sum()) / res.delta) for r in res.dims if "mix_effect" in r.table]
+            mixes = [(r, float(r.table["mix_effect"].sum()) / res.delta)
+                     for r in res.dims if "mix_effect" in r.table]
             mixes = [(r, m) for r, m in mixes if m >= 0.6]
             if mixes:
                 top_mix = max(mixes, key=lambda x: x[1])[0]
@@ -219,42 +226,48 @@ class RootCauseAnalyzer:
                 res.mix_driven = True
                 return self._extras(res, metric, model, cur, prev, filters, filters, rec)
 
-        # drill-down path
         f = dict(filters)
         used = set(filters)
-        total = res.delta
-        pool = [r for r in res.dims]
+        pool = list(res.dims)
+
         for depth in range(max_depth):
             if not pool:
                 break
+
             best = focus[0] if (depth == 0 and focus) else pool[0]
             if best.score <= 0.02 and depth > 0:
                 break
+
             tbl = best.table[best.table.member != "(none)"]
             if "weight" in tbl:
                 tbl = tbl[(tbl["weight"] >= 0.02) | (tbl["weight_prev"] >= 0.02)]
             if tbl.empty:
                 break
+
             top = tbl.iloc[0]
             slice_total = best.table["delta"].sum()
             if slice_total and np.sign(top["delta"]) != np.sign(slice_total):
                 break
+
             share = top["delta"] / slice_total if slice_total else 0.0
             if depth > 0 and abs(share) < 0.25:
                 break
+
             res.path.append(DrillStep(best.dimension, str(top["member"]), float(top["delta"]), float(share), dict(f)))
-            f = {**f, best.dimension: [str(top["member"])]}
+            f = {**f, best.dimension: [str(top["member"]) ]}
             used.add(best.dimension)
+
             nxt = [d for d in LEVEL1.get(model, []) + DEEPER.get(model, [])
                    if d in allowed and d not in used and _eligible(d, f)]
             if metric in COST_METRICS and "supplier" in allowed and "supplier" not in used and "supplier" not in nxt:
                 nxt.insert(0, "supplier")
+
             pool = []
             for d in nxt:
                 t = self.by_dim(metric, cur, prev, d, f, rec)
                 pool.append(DimResult(d, t, self.score(t, t["delta"].sum())))
             pool.sort(key=lambda r: -r.score)
-            # prefer the natural child level when one member of it explains most of the slice
+
             child = HIERARCHY.get(best.dimension)
             for i, r in enumerate(pool):
                 if r.dimension == child:
