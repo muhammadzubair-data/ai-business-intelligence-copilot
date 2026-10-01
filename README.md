@@ -4,6 +4,38 @@ Ask a business question in plain English. Get the answer, the reason behind it, 
 
 ## 🚀 Live Demo
 
+## Product Walkthrough
+
+### Root-Cause Analysis
+
+Ask a business question in plain English and trace the answer from the headline KPI change to the segments and drivers responsible for it.
+
+![Root Cause Analysis](docs/screenshots/01_root_cause.png)
+
+### Multi-Step Investigation
+
+Move beyond a single answer with guided analytical investigations and follow-up questions.
+
+![Business Investigation](docs/screenshots/02_investigation.png)
+
+### Anomaly Detection
+
+Automatically surface unusual business behavior and investigate the metrics and dimensions behind it.
+
+![Anomaly Detection](docs/screenshots/03_anomalies.png)
+
+### Forecasting
+
+Generate forward-looking business forecasts while preserving historical context, uncertainty ranges, assumptions, and supporting evidence.
+
+![Revenue Forecast](docs/screenshots/04_forecast.png)
+
+### Governed Answers & Guardrails
+
+The copilot is designed to distinguish supported analytical questions from requests that cannot be reliably answered from the available business data.
+
+![Governed Unsupported Question](docs/screenshots/05_unsupported.png)
+
 **Try the deployed application:**
 
 https://zubairlabs-ai-copilot.streamlit.app
